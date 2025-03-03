@@ -1,0 +1,51 @@
+name: Build and Deploy to Clean Branch
+
+on:
+  workflow_call:
+    inputs:
+      files:
+        description: "List of files/directories to copy (space-separated)"
+        required: true
+        type: string
+      branch:
+        description: "Target branch"
+        required: false
+        default: "dist"
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm i
+
+      - name: Install TypeScript & tsc-alias globally
+        run: npm install -g typescript tsc-alias
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Prepare and Push to Target Branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout --orphan ${{ inputs.branch }}
+
+          git reset -q HEAD --
+          git add -f -A ${{ inputs.files }}
+
+          # Commit and force push
+          git commit -m "Deploy to ${{ inputs.branch }}"
+          git push origin ${{ inputs.branch }} --force
