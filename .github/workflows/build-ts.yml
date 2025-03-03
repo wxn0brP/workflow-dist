@@ -12,8 +12,8 @@ on:
         required: false
         default: "dist"
         type: string
-      customNpm:
-        description: "Run custom npm command"
+      customCommands:
+        description: "Run custom commands"
         required: false
         type: string
 
@@ -40,10 +40,10 @@ jobs:
       - name: Build Project
         run: npm run build
 
-      - name: Run Custom NPM Command
-        if: ${{ inputs.customNpm }}
+      - name: Run Custom Commands
+        if: ${{ inputs.customCommands }}
         run: |
-          npm run ${{ inputs.customNpm }}
+          eval ${{ inputs.customCommands }}
 
       - name: Prepare and Push to Target Branch
         run: |
