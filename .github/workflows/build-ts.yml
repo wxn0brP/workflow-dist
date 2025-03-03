@@ -12,6 +12,10 @@ on:
         required: false
         default: "dist"
         type: string
+      customNpm:
+        description: "Run custom npm command"
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -35,6 +39,11 @@ jobs:
 
       - name: Build Project
         run: npm run build
+
+      - name: Run Custom NPM Command
+        if: ${{ inputs.customNpm }}
+        run: |
+          npm run ${{ inputs.customNpm }}
 
       - name: Prepare and Push to Target Branch
         run: |
