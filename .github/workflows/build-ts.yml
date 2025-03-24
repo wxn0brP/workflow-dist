@@ -5,7 +5,8 @@ on:
     inputs:
       files:
         description: "List of files/directories to copy (space-separated)"
-        required: true
+        required: false
+        default: "dist package.json"
         type: string
       branch:
         description: "Target branch"
