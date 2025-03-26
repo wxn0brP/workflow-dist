@@ -54,7 +54,8 @@ jobs:
           git checkout --orphan ${{ inputs.branch }}
 
           git reset -q HEAD --
-          git add -f -A ${{ inputs.files }}
+          FILES=$(echo "${{ inputs.files }}" | tr '\n' ' ')
+          git add -f -A $FILES
 
           # Commit and force push
           git commit -m "Deploy to ${{ inputs.branch }}"
