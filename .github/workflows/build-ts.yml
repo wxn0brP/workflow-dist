@@ -17,6 +17,11 @@ on:
         description: "Run custom commands"
         required: false
         type: string
+      publishToNpm:
+        description: "Publish the package to npm (optional)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -31,6 +36,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 22
+          registry-url: https://registry.npmjs.org/
 
       - name: Install Dependencies
         run: npm i
@@ -60,3 +66,9 @@ jobs:
           # Commit and force push
           git commit -m "Deploy to ${{ inputs.branch }}"
           git push origin ${{ inputs.branch }} --force
+
+      - name: Publish to npm
+        if: ${{ inputs.publishToNpm && startsWith(github.ref, 'refs/tags/') }}
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
