@@ -23,6 +23,10 @@ on:
         default: false
         type: boolean
 
+    secrets:
+      NPM_TOKEN:
+        required: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
