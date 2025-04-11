@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      removeScripts:
+        description: "Remove scripts from package.json (optional)"
+        required: false
+        default: true
+        type: boolean
 
     secrets:
       NPM_TOKEN:
@@ -55,6 +60,12 @@ jobs:
         if: ${{ inputs.customCommands }}
         run: |
           eval ${{ inputs.customCommands }}
+
+      - name: Remove scripts from package.json
+        if: ${{ inputs.removeScripts }}
+        run: |
+          jq 'del(.scripts)' package.json > package.json.tmp
+          mv package.json.tmp package.json
 
       - name: Prepare and Push to Target Branch
         run: |
