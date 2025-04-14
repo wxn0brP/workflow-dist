@@ -23,10 +23,14 @@ on:
         default: false
         type: boolean
       removeScripts:
-        description: "Remove scripts from package.json (optional)"
+        description: |
+          Control how scripts in package.json are handled:
+          - `0`: Retain all scripts (do nothing).
+          - `1`: Keep only the "start" script (if it exists); remove all others.
+          - `2`: Remove all scripts.
         required: false
-        default: true
-        type: boolean
+        default: 1
+        type: number
 
     secrets:
       NPM_TOKEN:
@@ -61,10 +65,36 @@ jobs:
         run: |
           eval ${{ inputs.customCommands }}
 
-      - name: Remove scripts from package.json
-        if: ${{ inputs.removeScripts }}
+      - name: Modify scripts in package.json
+        if: ${{ inputs.removeScripts != undefined }}
         run: |
-          jq 'del(.scripts)' package.json > package.json.tmp
+          REMOVE_SCRIPTS=${{ inputs.removeScripts }}
+
+          # Case 0: Retain all scripts (do nothing)
+          if [ "$REMOVE_SCRIPTS" -eq 0 ]; then
+            cp package.json package.json.tmp
+
+          # Case 1: Keep only the "start" script (if it exists)
+          elif [ "$REMOVE_SCRIPTS" -eq 1 ]; then
+            jq '
+              if .scripts then
+                .scripts |= {start: .start}
+              else
+                .
+              end
+            ' package.json > package.json.tmp
+
+          # Case 2: Remove all scripts
+          elif [ "$REMOVE_SCRIPTS" -eq 2 ]; then
+            jq 'del(.scripts)' package.json > package.json.tmp
+
+          # Invalid value (optional: handle unexpected cases)
+          else
+            echo "Invalid value for removeScripts. No changes made."
+            cp package.json package.json.tmp
+          fi
+
+          # Replace the original package.json with the modified version
           mv package.json.tmp package.json
 
       - name: Prepare and Push to Target Branch
