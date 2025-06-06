@@ -36,6 +36,11 @@ on:
         description: "Comma-separated list of scripts to retain (used with `scriptsHandling: custom-list`)"
         required: false
         type: string
+      createVersionedBranch:
+        description: "If true and run on tag, also create a dist-{version} branch"
+        required: false
+        default: true
+        type: boolean
 
     secrets:
       NPM_TOKEN:
@@ -76,11 +81,8 @@ jobs:
           HANDLING=${{ inputs.scriptsHandling }}
           CUSTOM_SCRIPTS=${{ inputs.customScripts }}
 
-          # Case 1: Remove all scripts
           if [ "$HANDLING" == "remove-all" ]; then
             jq 'del(.scripts)' package.json > package.json.tmp
-
-          # Case 2: Keep only the "start" script
           elif [ "$HANDLING" == "keep-start" ]; then
             jq '
               if .scripts then
@@ -89,8 +91,6 @@ jobs:
                 .
               end
             ' package.json > package.json.tmp
-
-          # Case 3: Retain a custom list of scripts
           elif [ "$HANDLING" == "custom-list" ]; then
             IFS=',' read -r -a SCRIPTS <<< "$CUSTOM_SCRIPTS"
             jq --argjson scripts "$(jq -n '$ARGS.positional' --args "${SCRIPTS[@]}")" '
@@ -100,37 +100,43 @@ jobs:
                 .
               end
             ' package.json > package.json.tmp
-
-          # Default case: Retain all scripts (do nothing)
           else
             cp package.json package.json.tmp
           fi
 
-          # Replace the original package.json with the modified version
           mv package.json.tmp package.json
 
       - name: Prepare and Push to Target Branch
         run: |
+          set -e
+
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          git checkout --orphan ${{ inputs.branch }}
+          VERSIONED_BRANCH=""
+          TAG_REF="${GITHUB_REF##refs/tags/}"
 
-          git reset -q HEAD --
-
-          DEFAULT_FILES="dist package.json"
-          INPUT_FILES="${{ inputs.files }}"
-          FILES=$(echo "$INPUT_FILES" | tr '\n' ' ')
-
-          if [ "$INPUT_FILES" = "$DEFAULT_FILES" ] && [ -f LICENSE ]; then
-            FILES="$FILES LICENSE"
+          # Determine if we need a versioned branch
+          if [[ "${{ inputs.createVersionedBranch }}" == "true" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSIONED_BRANCH="${{ inputs.branch }}-${TAG_REF}"
           fi
 
-          git add -f -A $FILES
+          # Create and push main deploy branch
+          git checkout --orphan "${{ inputs.branch }}"
+          git reset -q HEAD --
 
-          # Commit and force push
+          FILES=$(echo "${{ inputs.files }}" | tr '\n' ' ')
+          [ "$FILES" = "dist package.json" ] && [ -f LICENSE ] && FILES="$FILES LICENSE"
+
+          git add -f -A $FILES
           git commit -m "Deploy to ${{ inputs.branch }}"
-          git push origin ${{ inputs.branch }} --force
+          git push origin "${{ inputs.branch }}" --force
+
+          # If applicable, create versioned dist branch
+          if [ -n "$VERSIONED_BRANCH" ]; then
+            git checkout -b "$VERSIONED_BRANCH"
+            git push origin "$VERSIONED_BRANCH" --force
+          fi
 
       - name: Publish to npm
         if: ${{ inputs.publishToNpm && startsWith(github.ref, 'refs/tags/') }}
