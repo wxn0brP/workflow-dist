@@ -125,8 +125,13 @@ jobs:
           git checkout --orphan "${{ inputs.branch }}"
           git reset -q HEAD --
 
-          FILES=$(echo "${{ inputs.files }}" | tr '\n' ' ')
-          [ "$FILES" = "dist package.json" ] && [ -f LICENSE ] && FILES="$FILES LICENSE"
+          DEFAULT_FILES="dist package.json"
+          INPUT_FILES="${{ inputs.files }}"
+          FILES=$(echo "$INPUT_FILES" | tr '\n' ' ')
+
+          if [ "$INPUT_FILES" = "$DEFAULT_FILES" ] && [ -f LICENSE ]; then
+            FILES="$FILES LICENSE"
+          fi
 
           git add -f -A $FILES
           git commit -m "Deploy to ${{ inputs.branch }}"
