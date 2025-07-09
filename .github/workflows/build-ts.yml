@@ -163,7 +163,9 @@ jobs:
             fi
           done
 
+          mkdir -p ${{ inputs.out }}
           mv -f ./tmp_file/* ${{ inputs.out }}
+          cd ${{ inputs.out }}
 
           git add -f -A $FILES
           git commit -m "Deploy to ${{ inputs.branch }}"
