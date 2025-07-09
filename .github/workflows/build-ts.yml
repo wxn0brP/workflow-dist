@@ -50,6 +50,11 @@ on:
         required: false
         default: "."
         type: string
+      out:
+        description: "Output directory"
+        required: false
+        default: "."
+        type: string
 
     secrets:
       NPM_TOKEN:
@@ -149,6 +154,16 @@ jobs:
           if [ "$INPUT_FILES" = "$DEFAULT_FILES" ] && [ -f LICENSE ]; then
             FILES="$FILES LICENSE"
           fi
+
+          for file in $FILES; do
+            if [ -e "$file" ]; then
+              mv "$file" ".tmp_file/"
+            else
+              echo "Nie istnieje: $file"
+            fi
+          done
+
+          mv -f ./tmp_file/* ${{ inputs.out }}
 
           git add -f -A $FILES
           git commit -m "Deploy to ${{ inputs.branch }}"
