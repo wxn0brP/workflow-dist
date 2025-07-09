@@ -45,6 +45,11 @@ on:
         required: false
         default: true
         type: boolean
+      path:
+        description: "Working directory"
+        required: false
+        default: "."
+        type: string
 
     secrets:
       NPM_TOKEN:
@@ -55,6 +60,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.path }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
