@@ -155,6 +155,7 @@ jobs:
             FILES="$FILES LICENSE"
           fi
 
+          mkdir -p .tmp_file
           for file in $FILES; do
             if [ -e "$file" ]; then
               mv "$file" ".tmp_file/"
