@@ -165,7 +165,7 @@ jobs:
           done
 
           mkdir -p ${{ inputs.out }}
-          mv -f ./tmp_file/* ${{ inputs.out }}
+          mv -f ./.tmp_file/* ${{ inputs.out }}
           cd ${{ inputs.out }}
 
           git add -f -A $FILES
