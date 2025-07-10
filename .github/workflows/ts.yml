@@ -99,9 +99,8 @@ jobs:
       
       - name: Modify scripts in package.json
         if: ${{ inputs.scriptsHandling != 'retain-all' }}
-        shell: zx
+        shell: zx {0}
         run: |
-          #!/usr/bin/env zx
           import fs from 'fs'
           import path from 'path'
 
