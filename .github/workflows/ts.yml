@@ -110,24 +110,35 @@ jobs:
           const pkgPath = path.resolve('package.json')
           const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
 
-          if (handling === 'retain-all') {
-            console.log('Retaining all scripts, no changes.')
-          } else if (handling === 'remove-all') {
-            console.log('Removing .scripts from package.json')
-            delete pkg.scripts
-          } else if (handling === 'keep-start') {
-            console.log('Keeping only the "start" script')
-            pkg.scripts = pkg.scripts?.start ? { start: pkg.scripts.start } : {}
-          } else if (handling === 'custom-list') {
-            console.log(`Keeping only the following scripts: ${customScripts}`)
-            const keepList = customScripts.split(',').map(s => s.trim())
-            if (pkg.scripts) {
-              pkg.scripts = Object.fromEntries(
-                Object.entries(pkg.scripts).filter(([key]) => keepList.includes(key))
-              )
-            }
-          } else {
-            console.warn(`Unknown option: ${handling} — no changes.`)
+          switch (handling) {
+            case 'retain-all':
+              console.log('Retaining all scripts, no changes.')
+              break
+
+            case 'remove-all':
+              console.log('Removing .scripts from package.json')
+              delete pkg.scripts
+              break
+
+            case 'keep-start':
+              console.log('Keeping only the "start" script')
+              pkg.scripts = pkg.scripts?.start ? { start: pkg.scripts.start } : {}
+              break
+
+            case 'custom-list':
+              console.log(`Keeping only the following scripts: ${customScripts}`)
+              const keepList = customScripts.split(',').map(s => s.trim())
+              if (pkg.scripts) {
+                pkg.scripts = Object.fromEntries(
+                  Object.entries(pkg.scripts).filter(([key]) => keepList.includes(key))
+                )
+              }
+              break
+
+            default:
+              console.warn(`Unknown option: ${handling} — no changes.`)
+              break
+
           }
 
           fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
@@ -167,7 +178,7 @@ jobs:
             if [ -e "$file" ]; then
               mv "$file" ".tmp_file/"
             else
-              echo "Nie istnieje: $file"
+              echo "File not found: $file"
             fi
           done
 
