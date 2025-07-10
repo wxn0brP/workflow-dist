@@ -1,0 +1,192 @@
+name: Build and Deploy to Clean Branch
+
+on:
+  workflow_call:
+    inputs:
+      files:
+        description: "List of files/directories to copy (space-separated)"
+        required: false
+        default: "dist package.json"
+        type: string
+      branch:
+        description: "Target branch"
+        required: false
+        default: "dist"
+        type: string
+      customCommands:
+        description: "Run custom commands"
+        required: false
+        type: string
+      preBuildCustomCommands:
+        description: "Run custom commands before build"
+        required: false
+        type: string
+      publishToNpm:
+        description: "Publish the package to npm (optional)"
+        required: false
+        default: false
+        type: boolean
+      scriptsHandling:
+        description: |
+          Control how scripts in package.json are handled:
+          - `retain-all`: Retain all scripts.
+          - `remove-all`: Remove all scripts.
+          - `keep-start`: Keep only the "start" script (if it exists); remove all others.
+          - `custom-list`: Provide a custom list of scripts to retain.
+        required: false
+        default: "keep-start"
+        type: string
+      customScripts:
+        description: "Comma-separated list of scripts to retain (used with `scriptsHandling: custom-list`)"
+        required: false
+        type: string
+      createVersionedBranch:
+        description: "If true and run on tag, also create a dist-{version} branch"
+        required: false
+        default: true
+        type: boolean
+      path:
+        description: "Working directory"
+        required: false
+        default: "."
+        type: string
+      out:
+        description: "Output directory"
+        required: false
+        default: "."
+        type: string
+
+    secrets:
+      NPM_TOKEN:
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.path }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install Dependencies
+        run: npm i
+
+      - name: Install TypeScript & tsc-alias globally
+        run: npm install -g typescript tsc-alias zx
+
+      - name: Run Pre Build Custom Commands
+        if: ${{ inputs.preBuildCustomCommands }}
+        run: |
+          eval ${{ inputs.preBuildCustomCommands }}
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Run Custom Commands
+        if: ${{ inputs.customCommands }}
+        run: |
+          eval ${{ inputs.customCommands }}
+      
+      - name: Modify scripts in package.json
+        if: ${{ inputs.scriptsHandling != 'retain-all' }}
+        shell: zx
+        run: |
+          #!/usr/bin/env zx
+          import fs from 'fs'
+          import path from 'path'
+
+          const handling = process.env['INPUT_SCRIPTSHANDLING'] || 'retain-all'
+          const customScripts = process.env['INPUT_CUSTOMSCRIPTS'] || ''
+
+          const pkgPath = path.resolve('package.json')
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+
+          if (handling === 'retain-all') {
+            console.log('Retaining all scripts, no changes.')
+          } else if (handling === 'remove-all') {
+            console.log('Removing .scripts from package.json')
+            delete pkg.scripts
+          } else if (handling === 'keep-start') {
+            console.log('Keeping only the "start" script')
+            pkg.scripts = pkg.scripts?.start ? { start: pkg.scripts.start } : {}
+          } else if (handling === 'custom-list') {
+            console.log(`Keeping only the following scripts: ${customScripts}`)
+            const keepList = customScripts.split(',').map(s => s.trim())
+            if (pkg.scripts) {
+              pkg.scripts = Object.fromEntries(
+                Object.entries(pkg.scripts).filter(([key]) => keepList.includes(key))
+              )
+            }
+          } else {
+            console.warn(`Unknown option: ${handling} — no changes.`)
+          }
+
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+
+      - name: Prepare and Push to Target Branch
+        run: |
+          set -e
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          VERSIONED_BRANCH=""
+          TAG_REF="${GITHUB_REF##refs/tags/}"
+
+          # Determine if we need a versioned branch
+          if [[ "${{ inputs.createVersionedBranch }}" == "true" && "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSIONED_BRANCH="${{ inputs.branch }}-${TAG_REF}"
+          fi
+
+          # Create and push main deploy branch
+          git checkout --orphan "${{ inputs.branch }}"
+          git reset -q HEAD --
+
+          DEFAULT_FILES="dist package.json"
+          INPUT_FILES="${{ inputs.files }}"
+          FILES=$(echo "$INPUT_FILES" | tr '\n' ' ')
+
+          if [ "$INPUT_FILES" = "$DEFAULT_FILES" ] && [ -f LICENSE ]; then
+            FILES="$FILES LICENSE"
+          fi
+
+          mkdir -p .tmp_file
+          for file in $FILES; do
+            if [ -e "$file" ]; then
+              mv "$file" ".tmp_file/"
+            else
+              echo "Nie istnieje: $file"
+            fi
+          done
+
+          mkdir -p ${{ inputs.out }}
+          mv -f ./.tmp_file/* ${{ inputs.out }}
+          cd ${{ inputs.out }}
+
+          git add -f -A $FILES
+          git commit -m "Deploy to ${{ inputs.branch }}"
+          git push origin "${{ inputs.branch }}" --force
+
+          # If applicable, create versioned dist branch
+          if [ -n "$VERSIONED_BRANCH" ]; then
+            git checkout -b "$VERSIONED_BRANCH"
+            git push origin "$VERSIONED_BRANCH" --force
+          fi
+
+      - name: Publish to npm
+        if: ${{ inputs.publishToNpm && startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          cd ${{ inputs.out }}
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
