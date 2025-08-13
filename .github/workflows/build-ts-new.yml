@@ -70,7 +70,7 @@ jobs:
         working-directory: ${{ inputs.path }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
