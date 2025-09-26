@@ -1,0 +1,41 @@
+name: Deploy Directory to Branch
+
+on:
+  workflow_call:
+    inputs:
+      source_dir:
+        description: "Source directory to copy"
+        required: false
+        default: "docs"
+        type: string
+      target_branch:
+        description: "Target branch"
+        required: false
+        default: "docs"
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v5
+
+      - name: Deploy to branch
+        run: |
+          set -e
+          if [ ! -d "${{ inputs.source_dir }}" ]; then
+            echo "Source directory ${{ inputs.source_dir }} not found. Skipping deployment."
+            exit 0
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan ${{ inputs.target_branch }}
+          git reset -q HEAD --
+          # Move contents of source_dir to the root
+          mv ${{ inputs.source_dir }}/* .
+          git add -f .
+          git commit -m "Deploy from ${{ inputs.source_dir }} to ${{ inputs.target_branch }}"
+          git push origin ${{ inputs.target_branch }} --force
